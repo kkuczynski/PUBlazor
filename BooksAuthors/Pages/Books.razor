@@ -1,0 +1,202 @@
+﻿@page "/books"
+@using BooksAuthors.Data
+@inject DataService DataService
+<h1>Books</h1>
+
+    <label>
+        Title:
+        <input @bind="inputTitle" />
+    </label>
+
+    <label>
+        Release Date (DD-MM-RRRR):
+        <input @bind="inputDay" />
+    </label>
+        -
+    <input @bind="inputMonth" />
+
+    -
+    <input @bind="inputYear" />
+
+
+<button class="btn btn-primary" @onclick="() => addBook()">@bookButtonText</button>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Release Date</th>
+            <th>Rating</th>
+            <th>Authors</th>
+            <th>Options</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var book in DataService.Books)
+        {
+            <tr>
+                <td>@book.Title</td>
+                <td>@book.ReleaseDate.ToShortDateString()</td>
+                <td>@showRating(book)</td>
+                <td>@DataService.getAuthors(book)</td>
+                <td>
+                    <input @bind="inputRate" />
+                    <button class="btn btn-primary" @onclick="() => rate(book)">Rate!</button>
+                    <button class="btn btn-primary" @onclick="() => showAuthorsAssign(book)">Assign Author(s)</button>
+                    <button class="btn btn-primary" @onclick="() => showAuthorsUnassign(book)">Unassign Author(s)</button>
+                    <button class="btn btn-primary" @onclick="() => edit(book)">Edit</button>
+                    <button class="btn btn-primary" @onclick="() => delete(book)">Delete</button>
+
+
+
+                </td>
+            </tr>
+            @if (currentlyAssignedBookId == book.Id)
+            {
+                <tr>
+                    Assign authors:
+                    @foreach (var author in DataService.Authors)
+                    {
+                        if (!book.AuthorsIds.Contains(author.Id))
+                        {
+                            <button class="btn btn-primary" @onclick="() => assignAuthor(book, author)">@author.FirstName @author.SecondName</button>
+                        }
+                    }
+                </tr>
+            }
+            @if (currentlyUnassignedBookId == book.Id)
+            {
+                <tr>
+                    Unassign authors:
+                    @foreach (var author in DataService.Authors)
+                    {
+                        if (book.AuthorsIds.Contains(author.Id))
+                        {
+                            <button class="btn btn-primary" @onclick="() => unassignAuthor(book, author)">@author.FirstName @author.SecondName</button>
+                        }
+                    }
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    public string bookButtonText = "Add Book";
+    public string? inputTitle;
+    public DateTime inputReleaseDate;
+    public string? inputDay;
+    public string? inputMonth;
+    public string? inputYear;
+    public string? inputRate;
+    public int currentlyAssignedBookId = -1;
+    public int currentlyUnassignedBookId = -1;
+    public void edit(Book book)
+    {
+        currentlyEditing = true;
+        currentlyEditedBook = book;
+        inputTitle = currentlyEditedBook.Title;
+        inputDay = currentlyEditedBook.ReleaseDate.Day.ToString();
+        inputMonth = currentlyEditedBook.ReleaseDate.Month.ToString();
+        inputYear = currentlyEditedBook.ReleaseDate.Year.ToString();
+        bookButtonText = "Save Book";
+    }
+    public void delete(Book book) {
+        DataService.unassignFromAllAuthors(book);
+        DataService.Books.Remove(book);
+    }
+    public void showAuthorsAssign(Book book) {
+        if (currentlyAssignedBookId != book.Id)
+        {
+            currentlyAssignedBookId = book.Id;
+            currentlyUnassignedBookId = -1;
+        } else
+        {
+            currentlyAssignedBookId = -1;
+            currentlyUnassignedBookId = -1;
+        }
+    }
+    public void showAuthorsUnassign(Book book)
+    {
+        if (currentlyUnassignedBookId != book.Id)
+        {
+            currentlyUnassignedBookId = book.Id;
+            currentlyAssignedBookId = -1;
+        }
+        else
+        {
+            currentlyUnassignedBookId = -1;
+            currentlyAssignedBookId = -1;
+        }
+    }
+    public Book currentlyEditedBook;
+    public bool currentlyEditing = false;
+    public void addBook()
+    {
+        if (inputTitle != null && inputDay != null && inputMonth != null && inputYear != null)
+        {
+            if (inputTitle.Length > 0)
+            {
+                try
+                {
+                    inputReleaseDate = new DateTime(Convert.ToInt32(inputYear), Convert.ToInt32(inputMonth), Convert.ToInt32(inputDay));
+                    if (currentlyEditing == false)
+                    {
+                        DataService.addBook(inputTitle, inputReleaseDate);
+                        clearInputs();
+                    }
+                    else
+                    {
+                        currentlyEditedBook.Title = inputTitle;
+                        currentlyEditedBook.ReleaseDate = inputReleaseDate;
+                        currentlyEditing = false;
+                        bookButtonText = "Add Book";
+                        clearInputs();
+                    }
+                }
+                catch (Exception e)
+                {
+
+                }
+            }
+        }
+    }
+    public string showRating(Book book)
+    {
+        double rating = DataService.getBookRating(book);
+        if (rating < 0)
+        {
+            return "No ratings yet";
+        }
+        else return rating.ToString();
+    }
+    public void clearInputs()
+    {
+        inputMonth = "";
+        inputDay = "";
+        inputTitle = "";
+        inputYear = "";
+    }
+
+    public void rate(Book book)
+    {
+        try
+        {
+            int rate = Convert.ToInt32(inputRate);
+            if (rate >= 0 && rate <= 10)
+            {
+                DataService.rateBook(book, rate);
+                inputRate = "";
+            }
+        }catch(Exception e) { }
+    }
+
+    public void assignAuthor(Book book, Author author)
+    {
+        DataService.assign(book, author);
+    }
+
+    public void unassignAuthor(Book book, Author author)
+    {
+        DataService.unassign(book, author);
+    }
+}
